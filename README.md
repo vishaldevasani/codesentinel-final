@@ -1,4 +1,3 @@
-HEAD
 # 🛡️ CodeSentinel — AI Code Review Assistant
 ### 100% Free · No credit card · Groq Llama 3.3 70B or Google Gemini 2.0 Flash
 
@@ -140,4 +139,3 @@ No API key? App runs in **demo mode** automatically — 5 pre-loaded realistic P
 | Port 8000 already in use | Another process on 8000 | `uvicorn main:app --port 8001` |
 =======
 # codesentinel-final
-eef207cd5a0776035d71254be529848d6121a32f
