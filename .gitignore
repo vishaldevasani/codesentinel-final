@@ -1,10 +1,11 @@
 # ── Environment & Secrets ────────────────────────────────────────
 # NEVER commit these — your API keys live here
 .env
-.env.local
-.env.production
-*.env
-
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.vercel/
 # ── Python ───────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
