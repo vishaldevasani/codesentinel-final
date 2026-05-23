@@ -839,7 +839,7 @@ a:hover { text-decoration: underline; }
     <div class="sidebar-divider"></div>
     <div class="sidebar-footer">
       <div class="sidebar-footer-label">Backend URL</div>
-      <div class="sidebar-footer-url" id="backend-url-display">http://localhost:8000</div>
+      <div class="sidebar-footer-url" id="backend-url-display">https://codesentinel-final.onrender.com</div>
     </div>
   </aside>
 
@@ -1028,12 +1028,12 @@ a:hover { text-decoration: underline; }
           <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
             <div>
               <div class="config-label">Backend URL</div>
-              <input class="config-input" id="cfg-backend" type="text" value="http://localhost:8000" oninput="updateBackendUrl(this.value)">
+              <input class="config-input" id="cfg-backend" type="text" value="https://codesentinel-final.onrender.com" oninput="updateBackendUrl(this.value)">
             </div>
             <div>
               <div class="config-label">Webhook Endpoint</div>
               <div class="config-url-row">
-                <span class="config-url-text" id="webhook-display">http://localhost:8000/webhook/github</span>
+                <span class="config-url-text" id="webhook-display">https://codesentinel-final.onrender.com/webhook/github</span>
                 <button class="copy-btn" onclick="copyWebhook()">Copy</button>
               </div>
             </div>
@@ -1078,7 +1078,7 @@ let allPRs = [];
 let currentPRKey = null;
 let activePRFilter = 'all';
 let activeIssueFilter = 'all';
-let backendUrl = 'http://localhost:8000';
+let backendUrl = 'https://codesentinel-final.onrender.com';
 let trendChart = null;
 let sevChart = null;
 let pollingInterval = null;
