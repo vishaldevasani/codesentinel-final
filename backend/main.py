@@ -158,6 +158,7 @@ async def analyze_with_groq(diff: str, pr_title: str) -> tuple[list, str, int, s
     Free limits: 6,000 req/day, 500K tokens/min
     """
     prompt = build_review_prompt(diff, pr_title)
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -173,14 +174,18 @@ async def analyze_with_groq(diff: str, pr_title: str) -> tuple[list, str, int, s
             },
             timeout=60
         )
+
         resp.raise_for_status()
         raw = resp.json()["choices"][0]["message"]["content"]
-result = parse_ai_response(raw)
 
-issues = result["issues"]
-summary = result["summary"]
-score = result["score"]
-return issues, summary, score, "groq/llama-3.3-70b"
+    result = parse_ai_response(raw)
+
+    issues = result["issues"]
+    summary = result["summary"]
+    score = result["score"]
+
+    return issues, summary, score, "groq/llama-3.3-70b"
+
 
 # ── AI Analysis — Google Gemini (FREE) ──────────────────────────
 async def analyze_with_gemini(diff: str, pr_title: str) -> tuple[list, str, int, str]:
@@ -190,23 +195,31 @@ async def analyze_with_gemini(diff: str, pr_title: str) -> tuple[list, str, int,
     No credit card required.
     """
     prompt = build_review_prompt(diff, pr_title)
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 4096},
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 4096
+                },
             },
             timeout=60
         )
+
         resp.raise_for_status()
         raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-   result = parse_ai_response(raw)
+
+    result = parse_ai_response(raw)
 
     issues = result["issues"]
     summary = result["summary"]
     score = result["score"]
-return issues, summary, score, "google/gemini-2.0-flash"
+
+    return issues, summary, score, "google/gemini-2.0-flash"
+
 
 # ── Shared prompt + parser ───────────────────────────────────────
 def build_review_prompt(diff: str, pr_title: str) -> str:
