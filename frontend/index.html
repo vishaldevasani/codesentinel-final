@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeSentinel — AI Code Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Dark theme (default) */
+  --bg-base: #0f1117;
+  --bg-surface: #161b27;
+  --bg-elevated: #1e2535;
+  --bg-hover: #242d40;
+  --bg-active: #1a2236;
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.12);
+  --text-primary: #e8edf5;
+  --text-secondary: #8892a4;
+  --text-muted: #4a5568;
+
+  /* Accent palette — cyan/purple inspired by screenshot 3 */
+  --accent: #00d4ff;
+  --accent-dim: rgba(0,212,255,0.12);
+  --accent-glow: rgba(0,212,255,0.25);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --pink: #f472b6;
+  --pink-dim: rgba(244,114,182,0.12);
+  --green: #34d399;
+  --green-dim: rgba(52,211,153,0.12);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,0.12);
+  --orange: #fb923c;
+  --orange-dim: rgba(251,146,60,0.12);
+  --yellow: #fbbf24;
+  --yellow-dim: rgba(251,191,36,0.12);
+
+  --font-ui: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --r: 12px;
+  --r-sm: 8px;
+  --r-lg: 16px;
+  --sidebar-w: 220px;
+  --topbar-h: 60px;
+  --transition: 0.2s ease;
+}
+
+[data-theme="light"] {
+  --bg-base: #f0f4f8;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f8fafc;
+  --bg-hover: #eef2f7;
+  --bg-active: #e8f0fe;
+  --border: rgba(0,0,0,0.07);
+  --border-strong: rgba(0,0,0,0.14);
+  --text-primary: #1a2035;
+  --text-secondary: #4a5568;
+  --text-muted: #9ba8b8;
+  --accent: #0099cc;
+  --accent-dim: rgba(0,153,204,0.1);
+  --accent-glow: rgba(0,153,204,0.2);
+  --purple: #7c3aed;
+  --purple-dim: rgba(124,58,237,0.08);
+  --green: #059669;
+  --green-dim: rgba(5,150,105,0.08);
+  --red: #dc2626;
+  --red-dim: rgba(220,38,38,0.08);
+  --orange: #d97706;
+  --orange-dim: rgba(217,119,6,0.08);
+}
+
+html { font-size: 14px; }
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Layout ── */
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  min-height: 100vh;
+}
+
+/* ── Topbar ── */
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 24px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  backdrop-filter: blur(12px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logo-mark {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.topbar-spacer { flex: 1; }
+
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 5px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+.btn-theme {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: var(--transition);
+}
+.btn-theme:hover { color: var(--text-primary); border-color: var(--border-strong); }
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--accent), #0099bb);
+  color: #000;
+  border: none;
+  border-radius: var(--r-sm);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+.btn-primary:hover { opacity: 0.9; box-shadow: 0 0 30px var(--accent-glow); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  height: calc(100vh - var(--topbar-h));
+  position: sticky;
+  top: var(--topbar-h);
+}
+
+.sidebar-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 10px;
+  margin: 12px 0 4px;
+}
+.sidebar-label:first-child { margin-top: 0; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background var(--transition), color var(--transition);
+  user-select: none;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.nav-item .nav-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.nav-item.active .nav-icon { opacity: 1; }
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+.sidebar-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.sidebar-recent-item:hover { background: var(--bg-hover); }
+.sidebar-recent-item .sri-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sidebar-recent-item .sri-title {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+.sidebar-footer-label { font-size: 0.65rem; color: var(--text-muted); margin-bottom: 2px; }
+.sidebar-footer-url { font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent); }
+
+/* ── Main ── */
+.main {
+  overflow-y: auto;
+  padding: 28px 28px 40px;
+  background: var(--bg-base);
+}
+
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Page Header ── */
+.page-header { margin-bottom: 24px; }
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.page-subtitle { font-size: 0.82rem; color: var(--text-secondary); }
+
+/* ── Stats Grid ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color var(--transition), transform var(--transition);
+}
+.stat-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--stat-color, var(--accent)), transparent);
+  opacity: 0.5;
+}
+
+.stat-glow {
+  position: absolute;
+  top: -20px; right: -20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--stat-color, var(--accent));
+  opacity: 0.06;
+  filter: blur(20px);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 2.2rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-meta { font-size: 0.73rem; color: var(--text-muted); }
+
+/* ── Content grid ── */
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+}
+
+/* ── Panel ── */
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.panel:last-child { margin-bottom: 0; }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.panel-badge {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ── Filter tabs ── */
+.filter-tabs { display: flex; gap: 4px; }
+.filter-tab {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.filter-tab:hover { color: var(--text-secondary); border-color: var(--border-strong); }
+.filter-tab.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent-glow);
+}
+
+/* ── PR List ── */
+.pr-list { max-height: 500px; overflow-y: auto; }
+
+.pr-item {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--transition);
+  position: relative;
+}
+.pr-item:last-child { border-bottom: none; }
+.pr-item:hover { background: var(--bg-hover); }
+.pr-item.selected { background: var(--bg-active); }
+
+.pr-item-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+.pr-num {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.pr-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  line-height: 1.4;
+}
+.pr-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding-left: 28px;
+}
+.pr-meta .repo { font-family: var(--font-mono); }
+
+/* ── Badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-pending { background: var(--bg-elevated); color: var(--text-muted); }
+.badge-analyzing {
+  background: var(--purple-dim);
+  color: var(--purple);
+  animation: blink 1.2s ease-in-out infinite;
+}
+.badge-complete { background: var(--green-dim); color: var(--green); }
+.badge-error { background: var(--red-dim); color: var(--red); }
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+.score-pill {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.score-great { background: var(--green-dim); color: var(--green); }
+.score-ok { background: var(--yellow-dim); color: var(--yellow); }
+.score-bad { background: var(--red-dim); color: var(--red); }
+
+/* ── Issue Breakdown ── */
+.issue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.issue-row:last-child { border-bottom: none; }
+.issue-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.issue-name { flex: 1; font-size: 0.82rem; font-weight: 500; color: var(--text-primary); }
+.issue-count { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary); width: 20px; text-align: right; }
+.issue-bar-track { width: 70px; height: 3px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden; }
+.issue-bar-fill { height: 100%; border-radius: 2px; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+
+/* ── Detail view ── */
+#detail-view { display: none; }
+
+.detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: color var(--transition);
+}
+.detail-back:hover { color: var(--text-secondary); }
+
+.detail-header-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.detail-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.score-display {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 16px 20px;
+}
+
+.score-number {
+  font-family: var(--font-mono);
+  font-size: 2.8rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.score-divider { width: 1px; height: 40px; background: var(--border); }
+
+.score-text .label { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px; }
+.score-text .value { font-size: 0.84rem; color: var(--text-secondary); font-weight: 500; }
+
+.summary-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+
+/* ── Issues ── */
+.issues-list { display: flex; flex-direction: column; gap: 8px; }
+
+.issue-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  transition: border-color var(--transition);
+}
+.issue-card:hover { border-color: var(--border-strong); }
+
+.issue-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.type-pill {
+  font-size: 0.63rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.type-security { background: var(--red-dim); color: var(--red); }
+.type-bug { background: var(--orange-dim); color: var(--orange); }
+.type-performance { background: var(--purple-dim); color: var(--purple); }
+.type-style { background: var(--accent-dim); color: var(--accent); }
+
+.sev-critical { background: var(--red-dim); color: var(--red); }
+.sev-high { background: var(--orange-dim); color: var(--orange); }
+.sev-medium { background: var(--yellow-dim); color: var(--yellow); }
+.sev-low { background: var(--green-dim); color: var(--green); }
+
+.issue-card-title { flex: 1; font-size: 0.83rem; font-weight: 600; color: var(--text-primary); }
+.issue-card-file { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); flex-shrink: 0; }
+
+.issue-body { display: none; border-top: 1px solid var(--border); }
+.issue-body.open { display: block; padding: 14px 16px; }
+.issue-desc { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.7; margin-bottom: 12px; }
+.suggestion-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--green);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+.suggestion-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--green); margin-bottom: 5px; }
+.suggestion-text { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; }
+
+/* ── Config view ── */
+.config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.config-label { font-size: 0.77rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+.config-input {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.config-input:focus { border-color: var(--accent); }
+.config-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+}
+.config-url-text { font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); flex: 1; }
+.copy-btn {
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: color var(--transition);
+}
+.copy-btn:hover { color: var(--text-primary); }
+
+.step-list { display: flex; flex-direction: column; gap: 10px; }
+.step-item { display: flex; gap: 10px; align-items: flex-start; }
+.step-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.step-text { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; }
+code {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 52px 20px;
+  gap: 10px;
+  text-align: center;
+}
+.empty-icon {
+  width: 46px; height: 46px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+  margin-bottom: 2px;
+}
+.empty-title { font-size: 0.9rem; font-weight: 700; color: var(--text-secondary); }
+.empty-sub { font-size: 0.78rem; color: var(--text-muted); max-width: 260px; line-height: 1.5; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  transform: translateY(80px);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+  z-index: 999;
+  max-width: 320px;
+  pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+/* ── Animations ── */
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn 0.35s ease forwards; }
+.d1 { animation-delay: 0.04s; opacity: 0; }
+.d2 { animation-delay: 0.08s; opacity: 0; }
+.d3 { animation-delay: 0.12s; opacity: 0; }
+.d4 { animation-delay: 0.16s; opacity: 0; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <a class="logo" href="#">
+      <div class="logo-mark">CS</div>
+      CodeSentinel
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-status">
+      <span class="status-dot"></span>
+      Free API — Groq / Gemini
+    </div>
+    <button class="btn-theme" id="theme-toggle" onclick="toggleTheme()">
+      <span id="theme-icon">☾</span>
+      <span id="theme-label">Light</span>
+    </button>
+    <button class="btn-primary" id="btn-demo" onclick="triggerDemoReview()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Run Demo Review
+    </button>
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-label">Navigation</div>
+    <div class="nav-item active" id="nav-dashboard" onclick="showView('dashboard', this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" id="nav-pull-requests" onclick="showView('pull-requests', this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+      Pull Requests
+    </div>
+    <div class="nav-item" id="nav-settings" onclick="showView('settings', this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Configuration
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-label">Recent PRs</div>
+    <div id="sidebar-prs">
+      <div style="padding: 6px 10px; font-size: 0.74rem; color: var(--text-muted);">No PRs yet</div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-label">Backend URL</div>
+      <div class="sidebar-footer-url" id="backend-url-display">http://localhost:8000</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div class="view active" id="view-dashboard">
+      <div class="page-header fade-in">
+        <div class="page-title">Overview</div>
+        <div class="page-subtitle">AI-powered code review across all your repositories</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card fade-in d1" style="--stat-color:var(--accent)">
+          <div class="stat-glow"></div>
+          <div class="stat-label">PRs Analyzed</div>
+          <div class="stat-value" id="stat-prs">0</div>
+          <div class="stat-meta">Total reviews run</div>
+        </div>
+        <div class="stat-card fade-in d2" style="--stat-color:var(--red)">
+          <div class="stat-glow"></div>
+          <div class="stat-label">Issues Found</div>
+          <div class="stat-value" id="stat-issues">0</div>
+          <div class="stat-meta">Across all PRs</div>
+        </div>
+        <div class="stat-card fade-in d3" style="--stat-color:var(--orange)">
+          <div class="stat-glow"></div>
+          <div class="stat-label">Critical</div>
+          <div class="stat-value" id="stat-critical">0</div>
+          <div class="stat-meta">High-priority findings</div>
+        </div>
+        <div class="stat-card fade-in d4" style="--stat-color:var(--green)">
+          <div class="stat-glow"></div>
+          <div class="stat-label">Avg Score</div>
+          <div class="stat-value" id="stat-score">—</div>
+          <div class="stat-meta">Code quality rating</div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div>
+          <div class="panel fade-in">
+            <div class="panel-header">
+              <div class="panel-title">Issue Trends</div>
+              <div class="panel-badge">last 10 reviews</div>
+            </div>
+            <div style="padding:18px 20px;">
+              <div style="position:relative;height:190px;">
+                <canvas id="trend-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel fade-in">
+            <div class="panel-header">
+              <div class="panel-title">Pull Requests</div>
+              <div class="filter-tabs">
+                <button class="filter-tab active" onclick="filterPRs('all',this)">All</button>
+                <button class="filter-tab" onclick="filterPRs('complete',this)">Complete</button>
+                <button class="filter-tab" onclick="filterPRs('analyzing',this)">Analyzing</button>
+              </div>
+            </div>
+            <div class="pr-list" id="pr-list">
+              <div class="empty-state">
+                <div class="empty-icon">◈</div>
+                <div class="empty-title">No reviews yet</div>
+                <div class="empty-sub">Click "Run Demo Review" or configure a GitHub webhook to start.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div>
+          <div class="panel fade-in">
+            <div class="panel-header"><div class="panel-title">Issue Breakdown</div></div>
+            <div id="issue-breakdown">
+              <div class="issue-row">
+                <div class="issue-icon" style="background:var(--red-dim);color:var(--red);">🔒</div>
+                <div class="issue-name">Security</div>
+                <div class="issue-count" id="cnt-security">0</div>
+                <div class="issue-bar-track"><div class="issue-bar-fill" id="bar-security" style="width:0%;background:var(--red)"></div></div>
+              </div>
+              <div class="issue-row">
+                <div class="issue-icon" style="background:var(--orange-dim);color:var(--orange);">🐛</div>
+                <div class="issue-name">Bugs</div>
+                <div class="issue-count" id="cnt-bug">0</div>
+                <div class="issue-bar-track"><div class="issue-bar-fill" id="bar-bug" style="width:0%;background:var(--orange)"></div></div>
+              </div>
+              <div class="issue-row">
+                <div class="issue-icon" style="background:var(--purple-dim);color:var(--purple);">⚡</div>
+                <div class="issue-name">Performance</div>
+                <div class="issue-count" id="cnt-performance">0</div>
+                <div class="issue-bar-track"><div class="issue-bar-fill" id="bar-performance" style="width:0%;background:var(--purple)"></div></div>
+              </div>
+              <div class="issue-row">
+                <div class="issue-icon" style="background:var(--accent-dim);color:var(--accent);">💅</div>
+                <div class="issue-name">Code Style</div>
+                <div class="issue-count" id="cnt-style">0</div>
+                <div class="issue-bar-track"><div class="issue-bar-fill" id="bar-style" style="width:0%;background:var(--accent)"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel fade-in">
+            <div class="panel-header"><div class="panel-title">Severity Distribution</div></div>
+            <div style="padding:16px 20px;">
+              <div style="position:relative;height:170px;">
+                <canvas id="sev-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PULL REQUESTS ═══ -->
+    <div class="view" id="view-pull-requests">
+      <div class="page-header">
+        <div class="page-title">Pull Requests</div>
+        <div class="page-subtitle">All analyzed pull requests and their AI review results</div>
+      </div>
+
+      <div id="detail-view">
+        <div class="detail-back" onclick="closeDetail()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to list
+        </div>
+
+        <div class="detail-header-card">
+          <div class="detail-title" id="detail-title">Loading…</div>
+          <div class="detail-meta" id="detail-meta"></div>
+          <div class="score-display">
+            <div>
+              <div class="score-number" id="detail-score">—</div>
+              <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">/100 quality</div>
+            </div>
+            <div class="score-divider"></div>
+            <div class="score-text">
+              <div class="label">AI Assessment</div>
+              <div class="value" id="detail-verdict">Pending analysis</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-card" id="detail-summary" style="display:none;"></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:0.88rem;font-weight:700;color:var(--text-primary);">Issues Found</div>
+          <div class="filter-tabs" id="issue-filter-tabs">
+            <button class="filter-tab active" onclick="filterIssues('all',this)">All</button>
+            <button class="filter-tab" onclick="filterIssues('security',this)">Security</button>
+            <button class="filter-tab" onclick="filterIssues('bug',this)">Bug</button>
+            <button class="filter-tab" onclick="filterIssues('performance',this)">Performance</button>
+            <button class="filter-tab" onclick="filterIssues('style',this)">Style</button>
+          </div>
+        </div>
+        <div class="issues-list" id="detail-issues"></div>
+      </div>
+
+      <div class="panel" id="pr-list-panel">
+        <div class="panel-header">
+          <div class="panel-title">All Reviews</div>
+          <div class="panel-badge" id="pr-count-badge">0 PRs</div>
+        </div>
+        <div class="pr-list" id="pr-list-2">
+          <div class="empty-state">
+            <div class="empty-icon">◈</div>
+            <div class="empty-title">No pull requests yet</div>
+            <div class="empty-sub">Run a demo review or configure a GitHub webhook to get started.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SETTINGS ═══ -->
+    <div class="view" id="view-settings">
+      <div class="page-header">
+        <div class="page-title">Configuration</div>
+        <div class="page-subtitle">Connect GitHub webhooks and configure API keys</div>
+      </div>
+      <div class="config-grid">
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">GitHub Integration</div></div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div class="config-label">Backend URL</div>
+              <input class="config-input" id="cfg-backend" type="text" value="http://localhost:8000" oninput="updateBackendUrl(this.value)">
+            </div>
+            <div>
+              <div class="config-label">Webhook Endpoint</div>
+              <div class="config-url-row">
+                <span class="config-url-text" id="webhook-display">http://localhost:8000/webhook/github</span>
+                <button class="copy-btn" onclick="copyWebhook()">Copy</button>
+              </div>
+            </div>
+            <div>
+              <div class="config-label">GitHub Token</div>
+              <input class="config-input" type="password" placeholder="ghp_…">
+            </div>
+            <div>
+              <div class="config-label">Anthropic API Key</div>
+              <input class="config-input" type="password" placeholder="sk-ant-…">
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">Setup Guide</div></div>
+          <div style="padding:20px;">
+            <div class="step-list">
+              <div class="step-item"><div class="step-num">1</div><div class="step-text">Install dependencies: <code>pip install -r requirements.txt</code></div></div>
+              <div class="step-item"><div class="step-num">2</div><div class="step-text">Copy <code>.env.example</code> → <code>.env</code> and fill <code>ANTHROPIC_API_KEY</code> + <code>GITHUB_TOKEN</code></div></div>
+              <div class="step-item"><div class="step-num">3</div><div class="step-text">Start server: <code>uvicorn main:app --reload</code></div></div>
+              <div class="step-item"><div class="step-num">4</div><div class="step-text">Expose with ngrok: <code>ngrok http 8000</code></div></div>
+              <div class="step-item"><div class="step-num">5</div><div class="step-text">Add the webhook URL above in GitHub repo → Settings → Webhooks</div></div>
+              <div class="step-item"><div class="step-num">6</div><div class="step-text">Open a PR — CodeSentinel reviews it automatically!</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast">
+  <div class="toast-dot"></div>
+  <span id="toast-msg">Done!</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── State ──
+let allPRs = [];
+let currentPRKey = null;
+let activePRFilter = 'all';
+let activeIssueFilter = 'all';
+let backendUrl = 'http://localhost:8000';
+let trendChart = null;
+let sevChart = null;
+let pollingInterval = null;
+let backendAvailable = false; // ← KEY FIX: track if real backend responded
+
+// ── Demo data (only used when explicitly triggered, never on load) ──
+const DEMO_PRS = [
+  {
+    pr_id: 'acme/backend-api#142',
+    repo: 'acme/backend-api',
+    title: 'Add user authentication endpoints',
+    author: 'alice',
+    url: 'https://github.com',
+    status: 'complete',
+    score: 42,
+    files_changed: 7, additions: 284, deletions: 31,
+    analyzed_at: new Date(Date.now() - 3600000).toISOString(),
+    summary: 'This PR introduces a critical SQL injection vulnerability and a hardcoded secret key. There are also performance concerns with an N+1 query pattern and minor code clarity issues.',
+    issues: [
+      { type:'security', severity:'critical', file:'app/auth.py', line:34, title:'SQL Injection Vulnerability', description:'String formatting used directly in SQL query allows injection attacks.', suggestion:'Use parameterized queries: cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))' },
+      { type:'security', severity:'high', file:'config/settings.py', line:12, title:'Hardcoded Secret Key', description:'A secret key is hardcoded directly in settings and will be committed to version control.', suggestion:'Use environment variable: SECRET_KEY = os.environ.get("SECRET_KEY")' },
+      { type:'bug', severity:'high', file:'app/utils.py', line:87, title:'Unhandled None Return', description:'get_user() can return None but result is accessed without null check, causing AttributeError.', suggestion:'Add null check: if user is None: raise HTTPException(404)' },
+      { type:'performance', severity:'medium', file:'app/views.py', line:112, title:'N+1 Query in Loop', description:'Database query inside a for-loop causes N+1 problem — 1001 queries instead of 1.', suggestion:'Use select_related() or batch-fetch with WHERE id IN (...) query.' },
+      { type:'style', severity:'low', file:'app/models.py', line:56, title:'Magic Number Without Context', description:'The value 86400 appears without explanation — future developers won\'t understand it.', suggestion:'Replace with: SECONDS_PER_DAY = 86400 or timedelta(days=1).total_seconds()' }
+    ]
+  },
+  {
+    pr_id: 'acme/frontend#87',
+    repo: 'acme/frontend',
+    title: 'Refactor payment form validation',
+    author: 'bob',
+    url: 'https://github.com',
+    status: 'complete',
+    score: 78,
+    files_changed: 3, additions: 92, deletions: 44,
+    analyzed_at: new Date(Date.now() - 7200000).toISOString(),
+    summary: 'Solid refactor with good separation of concerns. One XSS vulnerability and two minor performance issues worth addressing before merge.',
+    issues: [
+      { type:'security', severity:'high', file:'src/PaymentForm.jsx', line:23, title:'XSS via dangerouslySetInnerHTML', description:'User-provided name rendered via dangerouslySetInnerHTML without sanitization, allowing script injection.', suggestion:'Use plain text: <span>{cardholderName}</span> — React auto-escapes text nodes.' },
+      { type:'performance', severity:'low', file:'src/validators.js', line:67, title:'Regex Compiled on Every Call', description:'Credit card regex compiled on every keystroke event wastes CPU.', suggestion:'Move outside function: const CARD_RE = /^[0-9]{13,19}$/' }
+    ]
+  },
+  {
+    pr_id: 'acme/data-pipeline#33',
+    repo: 'acme/data-pipeline',
+    title: 'Optimize ETL job for large datasets',
+    author: 'charlie',
+    url: 'https://github.com',
+    status: 'complete',
+    score: 91,
+    files_changed: 5, additions: 148, deletions: 67,
+    analyzed_at: new Date(Date.now() - 14400000).toISOString(),
+    summary: 'Excellent optimization work. Batch processing improvements well-implemented. Only a minor style concern with inconsistent error logging.',
+    issues: [
+      { type:'style', severity:'low', file:'pipeline/etl.py', line:99, title:'Inconsistent Error Logging', description:'Some paths use print() while others use logging.error(). Inconsistency makes log aggregation harder.', suggestion:'Replace all print("Error:...") with logging.error(...) for consistent structured logging.' }
+    ]
+  }
+];
+
+// ── Nav ──
+function showView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  if (name === 'pull-requests') { closeDetail(); renderPRListFull(); }
+}
+
+// ── Load PRs — FIXED: don't fall back to demo data on connection failure ──
+async function loadPRs() {
+  try {
+    const r = await fetch(`${backendUrl}/prs`, { signal: AbortSignal.timeout(3000) });
+    const data = await r.json();
+    backendAvailable = true;
+    allPRs = data; // use exactly what the server returns, even if empty
+    renderAll();
+  } catch {
+    // Backend not running — leave allPRs as-is (empty on first load, or previous data)
+    if (!backendAvailable) {
+      // Only set empty on very first load attempt
+      if (allPRs.length === 0) renderAll();
+    }
+  }
+}
+
+async function loadStats() {
+  if (!backendAvailable) return;
+  try {
+    const r = await fetch(`${backendUrl}/stats`, { signal: AbortSignal.timeout(3000) });
+    const data = await r.json();
+    if (data.total_prs !== undefined) animateVal('stat-prs', data.total_prs);
+    if (data.total_issues !== undefined) animateVal('stat-issues', data.total_issues);
+    if (data.issues_by_severity?.critical !== undefined) animateVal('stat-critical', data.issues_by_severity.critical);
+  } catch {}
+}
+
+// ── Render ──
+function renderAll() {
+  renderPRList();
+  renderPRListFull();
+  renderSidebar();
+  updateStats();
+  renderCharts();
+}
+
+function scoreClass(s) {
+  return s >= 80 ? 'score-great' : s >= 60 ? 'score-ok' : 'score-bad';
+}
+
+function buildPRItem(pr) {
+  const issues = pr.issues ? pr.issues.length : 0;
+  const crits = pr.issues ? pr.issues.filter(i => i.severity === 'critical').length : 0;
+  const scoreHTML = pr.status === 'complete'
+    ? `<span class="score-pill ${scoreClass(pr.score)}">${pr.score}/100</span>` : '';
+  return `<div class="pr-item ${currentPRKey === pr.pr_id ? 'selected':''}" onclick="openDetail('${esc(pr.pr_id)}')">
+    <div class="pr-item-top">
+      <span class="pr-num">#${pr.pr_id.split('#').pop()}</span>
+      <span class="pr-title">${esc(pr.title)}</span>
+      <span class="badge badge-${pr.status}">${pr.status}</span>
+    </div>
+    <div class="pr-meta">
+      <span class="repo">${pr.repo}</span>
+      <span>by ${pr.author}</span>
+      ${pr.files_changed ? `<span>${pr.files_changed} files</span>` : ''}
+      ${issues > 0 ? `<span style="color:var(--red)">${issues} issue${issues!==1?'s':''}</span>` : ''}
+      ${crits > 0 ? `<span style="color:var(--red);font-weight:600">⚑ ${crits} critical</span>` : ''}
+      ${scoreHTML}
+    </div>
+  </div>`;
+}
+
+function renderPRList() {
+  const el = document.getElementById('pr-list');
+  const list = activePRFilter === 'all' ? allPRs : allPRs.filter(p => p.status === activePRFilter);
+  el.innerHTML = list.length ? list.map(buildPRItem).join('') : emptyState('No reviews yet', 'Click "Run Demo Review" or configure a GitHub webhook.');
+}
+
+function renderPRListFull() {
+  const el = document.getElementById('pr-list-2');
+  document.getElementById('pr-count-badge').textContent = `${allPRs.length} PR${allPRs.length!==1?'s':''}`;
+  el.innerHTML = allPRs.length ? allPRs.map(buildPRItem).join('') : emptyState('No pull requests yet', 'Run a demo review or configure a GitHub webhook.');
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar-prs');
+  if (!allPRs.length) { el.innerHTML = `<div style="padding:6px 10px;font-size:0.74rem;color:var(--text-muted);">No PRs yet</div>`; return; }
+  el.innerHTML = allPRs.slice(0,6).map(pr => `
+    <div class="sidebar-recent-item" onclick="document.getElementById('nav-pull-requests').click();openDetail('${esc(pr.pr_id)}')">
+      <div class="sri-dot" style="background:${pr.score>=80?'var(--green)':pr.score>=60?'var(--yellow)':'var(--red)'}"></div>
+      <div class="sri-title">${esc(pr.title)}</div>
+    </div>`).join('');
+}
+
+function emptyState(title, sub) {
+  return `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-title">${title}</div><div class="empty-sub">${sub}</div></div>`;
+}
+
+// ── Stats ──
+function updateStats() {
+  const done = allPRs.filter(p => p.status === 'complete');
+  const totalIssues = allPRs.reduce((s,p) => s + (p.issues?.length||0), 0);
+  const critical = allPRs.reduce((s,p) => s + (p.issues?.filter(i=>i.severity==='critical').length||0), 0);
+  const avg = done.length ? Math.round(done.reduce((s,p)=>s+p.score,0)/done.length) : null;
+
+  animateVal('stat-prs', allPRs.length);
+  animateVal('stat-issues', totalIssues);
+  animateVal('stat-critical', critical);
+  document.getElementById('stat-score').textContent = avg !== null ? avg : '—';
+
+  const counts = { security:0, bug:0, performance:0, style:0 };
+  allPRs.forEach(p => (p.issues||[]).forEach(i => { counts[i.type] = (counts[i.type]||0)+1; }));
+  const max = Math.max(...Object.values(counts), 1);
+  ['security','bug','performance','style'].forEach(t => {
+    document.getElementById(`cnt-${t}`).textContent = counts[t];
+    document.getElementById(`bar-${t}`).style.width = `${(counts[t]/max)*100}%`;
+  });
+}
+
+function animateVal(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let cur = parseInt(el.textContent) || 0;
+  if (cur === target) return;
+  const step = Math.max(1, Math.ceil(Math.abs(target-cur)/20));
+  const t = setInterval(() => {
+    cur = target > cur ? Math.min(cur+step, target) : Math.max(cur-step, target);
+    el.textContent = cur;
+    if (cur === target) clearInterval(t);
+  }, 30);
+}
+
+// ── Charts ──
+function renderCharts() {
+  renderTrendChart();
+  renderSevChart();
+}
+
+function chartColor(varName) {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
+
+function renderTrendChart() {
+  const ctx = document.getElementById('trend-chart');
+  if (!ctx) return;
+  const prs = allPRs.slice(-10);
+  const labels = prs.map(p => '#'+p.pr_id.split('#').pop());
+  const scores = prs.map(p => p.score||0);
+  const counts = prs.map(p => p.issues?.length||0);
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels.length ? labels : ['No data'],
+      datasets: [
+        {
+          label: 'Quality Score', data: scores.length ? scores : [0], yAxisID:'y',
+          borderColor: chartColor('--accent'), backgroundColor: chartColor('--accent-dim'),
+          borderWidth: 2, pointRadius: 4, pointBackgroundColor: chartColor('--accent'),
+          tension: 0.4, fill: true
+        },
+        {
+          label: 'Issues', data: counts.length ? counts : [0], yAxisID:'y1',
+          borderColor: chartColor('--red'), backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 4, pointBackgroundColor: chartColor('--red'),
+          tension: 0.4, borderDash: [4,3]
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: { legend:{ display:false } },
+      scales: {
+        x: { grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ color:'#4a5568', font:{ size:10, family:"'JetBrains Mono'" } } },
+        y: { position:'left', min:0, max:100, grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ color: chartColor('--accent'), font:{ size:10 } } },
+        y1: { position:'right', min:0, grid:{ drawOnChartArea:false }, ticks:{ color: chartColor('--red'), font:{ size:10 } } }
+      }
+    }
+  });
+}
+
+function renderSevChart() {
+  const ctx = document.getElementById('sev-chart');
+  if (!ctx) return;
+  const c = {critical:0, high:0, medium:0, low:0};
+  allPRs.forEach(p => (p.issues||[]).forEach(i => { c[i.severity] = (c[i.severity]||0)+1; }));
+  if (sevChart) sevChart.destroy();
+  const total = Object.values(c).reduce((a,b)=>a+b,0);
+  sevChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Critical','High','Medium','Low'],
+      datasets: [{
+        data: [c.critical, c.high, c.medium, c.low],
+        backgroundColor: ['#f87171','#fb923c','#fbbf24','#34d399'],
+        borderColor: chartColor('--bg-surface'),
+        borderWidth: 3,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout:'70%',
+      plugins: {
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.raw}${total?' ('+Math.round(ctx.raw/total*100)+'%)':''}` } }
+      }
+    }
+  });
+}
+
+// ── Detail ──
+function openDetail(key) {
+  currentPRKey = key;
+  const pr = allPRs.find(p => p.pr_id === key);
+  if (!pr) return;
+
+  document.getElementById('pr-list-panel').style.display = 'none';
+  document.getElementById('detail-view').style.display = 'block';
+
+  document.getElementById('detail-title').textContent = pr.title;
+  document.getElementById('detail-meta').innerHTML = `
+    <span style="font-family:var(--font-mono)">${pr.repo}</span>
+    <span>by <strong>${pr.author}</strong></span>
+    <span>${pr.files_changed||0} files</span>
+    <span style="color:var(--green)">+${pr.additions||0}</span>
+    <span style="color:var(--red)">-${pr.deletions||0}</span>
+    <a href="${pr.url}" target="_blank">View on GitHub →</a>`;
+
+  const scoreEl = document.getElementById('detail-score');
+  scoreEl.textContent = pr.status === 'complete' ? pr.score : '…';
+  scoreEl.style.color = pr.score >= 80 ? 'var(--green)' : pr.score >= 60 ? 'var(--yellow)' : 'var(--red)';
+  document.getElementById('detail-verdict').textContent =
+    pr.score >= 80 ? 'Minor suggestions only — safe to approve.' :
+    pr.score >= 60 ? 'Some issues worth addressing before merge.' :
+    'Critical issues found — requires attention.';
+
+  const sum = document.getElementById('detail-summary');
+  if (pr.summary) { sum.textContent = pr.summary; sum.style.display = 'block'; }
+  else sum.style.display = 'none';
+
+  activeIssueFilter = 'all';
+  document.querySelectorAll('#issue-filter-tabs .filter-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+  renderIssues(pr.issues||[]);
+  renderPRList();
+}
+
+function closeDetail() {
+  currentPRKey = null;
+  document.getElementById('detail-view').style.display = 'none';
+  document.getElementById('pr-list-panel').style.display = 'block';
+  renderPRListFull();
+}
+
+function renderIssues(issues) {
+  const el = document.getElementById('detail-issues');
+  const list = activeIssueFilter === 'all' ? issues : issues.filter(i => i.type === activeIssueFilter);
+  if (!list.length) { el.innerHTML = emptyState('No issues found', 'Clean code!'); return; }
+  const order = {critical:0,high:1,medium:2,low:3};
+  el.innerHTML = [...list].sort((a,b)=>(order[a.severity]||4)-(order[b.severity]||4)).map((issue,i) => `
+    <div class="issue-card fade-in" style="animation-delay:${i*0.03}s">
+      <div class="issue-card-header" onclick="toggleIssue(this)">
+        <span class="type-pill type-${issue.type}">${issue.type}</span>
+        <span class="type-pill sev-${issue.severity}">${issue.severity}</span>
+        <span class="issue-card-title">${esc(issue.title)}</span>
+        <span class="issue-card-file">${issue.file}${issue.line?':'+issue.line:''}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--text-muted);flex-shrink:0;transition:transform 0.2s"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">${esc(issue.description)}</div>
+        <div class="suggestion-box">
+          <div class="suggestion-label">💡 Suggestion</div>
+          <div class="suggestion-text">${esc(issue.suggestion)}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleIssue(header) {
+  const body = header.nextElementSibling;
+  const icon = header.querySelector('svg');
+  body.classList.toggle('open');
+  icon.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+// ── Filters ──
+function filterPRs(f, btn) {
+  activePRFilter = f;
+  document.querySelectorAll('#view-dashboard .filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderPRList();
+}
+
+function filterIssues(f, btn) {
+  activeIssueFilter = f;
+  document.querySelectorAll('#issue-filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const pr = allPRs.find(p => p.pr_id === currentPRKey);
+  if (pr) renderIssues(pr.issues||[]);
+}
+
+// ── Demo trigger ──
+async function triggerDemoReview() {
+  const btn = document.getElementById('btn-demo');
+  btn.disabled = true;
+  btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Analyzing…`;
+
+  try {
+    const r = await fetch(`${backendUrl}/analyze/demo`, { method:'POST', signal:AbortSignal.timeout(5000) });
+    const data = await r.json();
+    showToast('Demo PR queued for analysis!');
+    startPolling(data.pr_key);
+  } catch {
+    // Add a synthetic demo PR with realistic data
+    const titles = ['feat: Add real-time notifications', 'fix: Resolve memory leak in cache', 'refactor: Clean up auth flow'];
+    const base = DEMO_PRS[Math.floor(Math.random()*DEMO_PRS.length)];
+    const newPR = {
+      ...base,
+      pr_id: `demo/repo#${Math.floor(Math.random()*900)+100}`,
+      title: titles[Math.floor(Math.random()*3)],
+      author: ['alice','bob','charlie'][Math.floor(Math.random()*3)],
+      status: 'analyzing',
+      analyzed_at: null,
+      score: 0, issues: []
+    };
+    allPRs.unshift(newPR);
+    renderAll();
+    showToast('Demo mode — simulating analysis…');
+    setTimeout(() => {
+      const idx = allPRs.findIndex(p => p.pr_id === newPR.pr_id);
+      if (idx >= 0) {
+        allPRs[idx] = { ...base, pr_id:newPR.pr_id, title:newPR.title, author:newPR.author, status:'complete', analyzed_at:new Date().toISOString() };
+        renderAll();
+        showToast('Analysis complete!');
+      }
+    }, 2800);
+  }
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Demo Review`;
+  }, 3500);
+}
+
+function startPolling(key) {
+  if (pollingInterval) clearInterval(pollingInterval);
+  let attempts = 0;
+  pollingInterval = setInterval(async () => {
+    attempts++;
+    try {
+      const r = await fetch(`${backendUrl}/prs/${encodeURIComponent(key)}`, { signal:AbortSignal.timeout(3000) });
+      const pr = await r.json();
+      const idx = allPRs.findIndex(p => p.pr_id === pr.pr_id);
+      if (idx >= 0) allPRs[idx] = pr; else allPRs.unshift(pr);
+      renderAll();
+      if (pr.status === 'complete' || pr.status === 'error' || attempts > 30) {
+        clearInterval(pollingInterval);
+        if (pr.status === 'complete') showToast(`Review done — ${pr.issues.length} issues found`);
+      }
+    } catch { if (attempts > 10) clearInterval(pollingInterval); }
+  }, 2000);
+}
+
+// ── Settings ──
+function updateBackendUrl(v) {
+  backendUrl = v.replace(/\/$/, '');
+  document.getElementById('webhook-display').textContent = `${backendUrl}/webhook/github`;
+  document.getElementById('backend-url-display').textContent = backendUrl;
+}
+
+function copyWebhook() {
+  navigator.clipboard.writeText(document.getElementById('webhook-display').textContent)
+    .then(() => showToast('Webhook URL copied!'));
+}
+
+// ── Theme ──
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    document.getElementById('theme-icon').textContent = '☾';
+    document.getElementById('theme-label').textContent = 'Light';
+    localStorage.setItem('cs-theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.getElementById('theme-icon').textContent = '☀';
+    document.getElementById('theme-label').textContent = 'Dark';
+    localStorage.setItem('cs-theme', 'light');
+  }
+  setTimeout(renderCharts, 50);
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── Utils ──
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+  // Restore theme
+  const saved = localStorage.getItem('cs-theme');
+  if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.getElementById('theme-icon').textContent = '☀';
+    document.getElementById('theme-label').textContent = 'Dark';
+  }
+
+  // KEY FIX: Start with empty state, then try backend.
+  // NEVER pre-populate with demo data on page load.
+  renderAll(); // renders empty state initially
+
+  loadPRs();   // populate from real backend if available
+  loadStats();
+
+  setInterval(() => { loadPRs(); loadStats(); }, 10000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+name: CodeSentinel CI
+
+# Runs on every push and pull request
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Lint & Start-up Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Set up Python 3.11
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install flake8
+
+      # 4. Lint — fail on real errors, warn on style
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 backend/main.py --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all other issues as warnings (don't fail CI for style)
+          flake8 backend/main.py --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+
+      # 5. Verify the app can import without crashing
+      - name: App import check
+        working-directory: backend
+        env:
+          GROQ_API_KEY: ""
+          GEMINI_API_KEY: ""
+          GITHUB_TOKEN: ""
+          GITHUB_WEBHOOK_SECRET: ""
+        run: |
+          python -c "import main; print('✅ main.py imports successfully')"
+
+      # 6. Start the server for 5 seconds and hit /health
+      - name: Smoke test — /health endpoint
+        working-directory: backend
+        env:
+          GROQ_API_KEY: ""
+          GEMINI_API_KEY: ""
+          GITHUB_TOKEN: ""
+          GITHUB_WEBHOOK_SECRET: ""
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          SERVER_PID=$!
+          sleep 5
+          curl --fail http://localhost:8000/health && echo "✅ /health OK"
+          curl --fail http://localhost:8000/stats  && echo "✅ /stats OK"
+          kill $SERVER_PID

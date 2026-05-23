@@ -1,0 +1,54 @@
+diff --git a/app/auth.py b/app/auth.py
+index a3f2b1c..9d4e8a0 100644
+--- a/app/auth.py
++++ b/app/auth.py
+@@ -30,8 +30,15 @@ class AuthService:
+     def __init__(self, db):
+         self.db = db
+ 
+-    def get_user(self, username):
+-        return self.db.query(f"SELECT * FROM users WHERE username='{username}'")
++    def get_user(self, username, password):
++        # TODO: fix this later
++        query = "SELECT * FROM users WHERE username='" + username + "' AND password='" + password + "'"
++        result = self.db.execute(query)
++        user = result.fetchone()
++        return user
++
++    def create_session(self, user_id):
++        SECRET_KEY = "hardcoded_secret_abc123"
++        token = jwt.encode({"user_id": user_id}, SECRET_KEY)
++        return token
+ 
+diff --git a/app/views.py b/app/views.py
+index c8e1d2a..3b5f6c9 100644
+--- a/app/views.py
++++ b/app/views.py
+@@ -105,6 +105,18 @@ class UserView:
+ 
+     def get_user_orders(self, user_ids):
+         orders = []
++        # Get all orders for each user
+         for uid in user_ids:
+-            orders.append(Order.get(uid))
++            user = User.objects.get(id=uid)
++            user_orders = Order.objects.filter(user=user)
++            for order in user_orders:
++                if order.status == 1 or order.status == 2 or order.status == 3:
++                    orders.append({
++                        "id": order.id,
++                        "total": order.amount * 0.01 + order.amount * 0.08 + order.amount * 0.02
++                    })
+         return orders
+ 
+diff --git a/app/utils.py b/app/utils.py
+index 1a2b3c4..5d6e7f8 100644
+--- a/app/utils.py
++++ b/app/utils.py
+@@ -82,6 +82,9 @@ def process_upload(request):
+     filename = request.POST.get('filename')
++    # Save to uploads directory
++    path = "/uploads/" + filename
++    with open(path, 'wb') as f:
++        f.write(request.FILES['file'].read())
++    return {"path": path}
