@@ -175,12 +175,12 @@ async def analyze_with_groq(diff: str, pr_title: str) -> tuple[list, str, int, s
         )
         resp.raise_for_status()
         raw = resp.json()["choices"][0]["message"]["content"]
-    result = parse_ai_response(raw)
+result = parse_ai_response(raw)
 
 issues = result["issues"]
 summary = result["summary"]
 score = result["score"]
-    return issues, summary, score, "groq/llama-3.3-70b"
+return issues, summary, score, "groq/llama-3.3-70b"
 
 # ── AI Analysis — Google Gemini (FREE) ──────────────────────────
 async def analyze_with_gemini(diff: str, pr_title: str) -> tuple[list, str, int, str]:
@@ -206,7 +206,7 @@ async def analyze_with_gemini(diff: str, pr_title: str) -> tuple[list, str, int,
     issues = result["issues"]
     summary = result["summary"]
     score = result["score"]
-    return issues, summary, score, "google/gemini-2.0-flash"
+return issues, summary, score, "google/gemini-2.0-flash"
 
 # ── Shared prompt + parser ───────────────────────────────────────
 def build_review_prompt(diff: str, pr_title: str) -> str:
