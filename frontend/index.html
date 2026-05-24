@@ -839,7 +839,7 @@ a:hover { text-decoration: underline; }
     <div class="sidebar-divider"></div>
     <div class="sidebar-footer">
       <div class="sidebar-footer-label">Backend URL</div>
-      <div class="sidebar-footer-url" id="backend-url-display">https://codesentinel-final.onrender.com</div>
+      <div class="sidebar-footer-url" id="backend-url-display"></div>
     </div>
   </aside>
 
@@ -1028,12 +1028,12 @@ a:hover { text-decoration: underline; }
           <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
             <div>
               <div class="config-label">Backend URL</div>
-              <input class="config-input" id="cfg-backend" type="text" value="https://codesentinel-final.onrender.com" oninput="updateBackendUrl(this.value)">
+              <input class="config-input" id="cfg-backend" type="text" value="" oninput="updateBackendUrl(this.value)">
             </div>
             <div>
               <div class="config-label">Webhook Endpoint</div>
               <div class="config-url-row">
-                <span class="config-url-text" id="webhook-display">https://codesentinel-final.onrender.com/webhook/github</span>
+                <span class="config-url-text" id="webhook-display"></span>
                 <button class="copy-btn" onclick="copyWebhook()">Copy</button>
               </div>
             </div>
@@ -1078,7 +1078,11 @@ let allPRs = [];
 let currentPRKey = null;
 let activePRFilter = 'all';
 let activeIssueFilter = 'all';
-let backendUrl = 'https://codesentinel-final.onrender.com';
+// Dynamically resolve backend URL:
+// - On localhost/127.0.0.1 → always use http://localhost:8000
+// - On any deployed domain → use the current origin (same host, no suffix needed)
+const _isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+let backendUrl = _isLocal ? 'http://localhost:8000' : window.location.origin;
 let trendChart = null;
 let sevChart = null;
 let pollingInterval = null;
@@ -1547,6 +1551,11 @@ function esc(s) {
 
 // ── Init ──
 window.addEventListener('DOMContentLoaded', () => {
+  // Seed all URL-bearing elements from the dynamic backendUrl
+  document.getElementById('backend-url-display').textContent = backendUrl;
+  document.getElementById('cfg-backend').value = backendUrl;
+  document.getElementById('webhook-display').textContent = `${backendUrl}/webhook/github`;
+
   // Restore theme
   const saved = localStorage.getItem('cs-theme');
   if (saved === 'light') {
